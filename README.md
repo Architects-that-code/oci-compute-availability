@@ -95,8 +95,10 @@ API validation is authoritative. Unknown query-file fields are rejected.
 
 The process scans immediately and waits five minutes **after completion** before
 scanning again. `--interval` accepts Go durations (minimum 30s); `--timeout` bounds
-a complete scan (default 10m). Queries run sequentially, reuse regional SDK clients,
-and have bounded HTTP timeouts and retries. A single replica avoids duplicate
+a complete scan (default 10m). Up to six regions are scanned concurrently by
+default (`--concurrency 1..32`); requests within each region remain sequential.
+Regional SDK clients are reused and have bounded HTTP timeouts and retries.
+A single replica avoids duplicate
 requests. Query configuration is loaded at startup; restart after changing it.
 
 ## Runtime identity
@@ -194,7 +196,32 @@ counts are unknown, not zero. `oci_capacity_available` is one only for `AVAILABL
 `oci_capacity_status` distinguishes `OUT_OF_HOST_CAPACITY` and
 `HARDWARE_NOT_SUPPORTED`. Query names identify the full requested configuration.
 Capacity is an observation at request time, not a reservation or launch guarantee.
-The sequential scan is not a simultaneous global snapshot.
+The scan is not a simultaneous global snapshot.
+
+## Retrieval speed and progress
+
+The 36-query default matrix produces 36 capacity requests per AD in every
+subscribed region. `--concurrency` bounds the number of active regional scans,
+including AD discovery. Default: 6. Use 1 for sequential retrieval or increase
+gradually while watching for throttling and network errors. Concurrency reduces
+elapsed time across regions; it does not reduce the number of OCI requests.
+
+```bash
+./dist/collector --once --auth config \
+  --profile DEFAULT --config-file "$HOME/.oci/config" \
+  --queries queries.example.json --concurrency 6
+```
+
+Progress is written to stderr: scan scope, regional start/completion, result/error
+counts, and regional elapsed time. One-shot result JSON remains on stdout.
+`--timeout` still limits the entire scan, including discovery, retries, and queued
+regions. Cancellation stops further capacity requests. Runtime failures in one
+region still mark the full scan incomplete and suppress all capacity results.
+
+For a quick smoke test, use a smaller query file or add an explicit `region`
+filter. This narrows coverage; `--concurrency` preserves the configured scope.
+An EOF error indicates a failed response, rather than evidence of unavailable
+capacity. The OCI SDK's existing retry policy remains enabled.
 
 See [CreateComputeCapacityReport](https://docs.oracle.com/en-us/iaas/tools/oci-cli/latest/oci_cli_docs/cmdref/compute/compute-capacity-report/create.html).
 
@@ -251,7 +278,8 @@ the regions and shapes/sizes for your workload, then test the full directory:
 
 For large global matrices use an explicit scan timeout appropriate to the query
 count multiplied by subscribed regions and ADs per region, for example
-`--queries /etc/capacity --timeout 1h`. Scans remain sequential;
+`--queries /etc/capacity --timeout 1h --concurrency 6`. Regions are scanned with
+bounded concurrency; requests within a region remain sequential;
 `--interval 5m` is a pause after the entire global scan, not a five-minute freshness
 guarantee. A failure anywhere suppresses all capacity-result series for that scan.
 Publish `make publish VERSION=v0.1.1` before deploying this directory configuration.

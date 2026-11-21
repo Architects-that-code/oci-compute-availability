@@ -8,6 +8,7 @@ import (
 	"github.com/oracle/oci-go-sdk/v65/identity"
 	"net/http"
 	"sort"
+	"sync"
 	"time"
 )
 
@@ -26,9 +27,10 @@ type reporter interface {
 	SubscribedRegions(context.Context) ([]string, error)
 }
 type ociReporter struct {
-	provider common.ConfigurationProvider
-	tenancy  string
-	clients  map[string]core.ComputeClient
+	provider  common.ConfigurationProvider
+	tenancy   string
+	clients   map[string]core.ComputeClient
+	clientsMu sync.Mutex
 }
 
 func (r *ociReporter) SubscribedRegions(ctx context.Context) ([]string, error) {
@@ -99,18 +101,30 @@ func (r *ociReporter) AvailabilityDomains(ctx context.Context, region string) ([
 	return names, nil
 }
 
-// Collection is sequential, so regional clients need no concurrent mutation.
-func (r *ociReporter) Report(ctx context.Context, q query) (core.ComputeCapacityReport, error) {
-	c, ok := r.clients[q.Region]
+func (r *ociReporter) client(region string) (core.ComputeClient, error) {
+	r.clientsMu.Lock()
+	defer r.clientsMu.Unlock()
+	c, ok := r.clients[region]
 	if !ok {
 		var err error
 		c, err = core.NewComputeClientWithConfigurationProvider(r.provider)
 		if err != nil {
-			return core.ComputeCapacityReport{}, err
+			return core.ComputeClient{}, err
 		}
-		c.SetRegion(q.Region)
+		c.SetRegion(region)
 		c.HTTPClient = &http.Client{Timeout: 45 * time.Second}
-		r.clients[q.Region] = c
+		if r.clients == nil {
+			r.clients = map[string]core.ComputeClient{}
+		}
+		r.clients[region] = c
+	}
+	return c, nil
+}
+
+func (r *ociReporter) Report(ctx context.Context, q query) (core.ComputeCapacityReport, error) {
+	c, err := r.client(q.Region)
+	if err != nil {
+		return core.ComputeCapacityReport{}, err
 	}
 	shape := core.CreateCapacityReportShapeAvailabilityDetails{InstanceShape: &q.Shape, InstanceShapeConfig: q.ShapeConfig}
 	if q.FaultDomain != "" {

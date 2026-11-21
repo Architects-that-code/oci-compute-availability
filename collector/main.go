@@ -157,6 +157,10 @@ func validateReport(q query, r core.ComputeCapacityReport) error {
 }
 
 func collect(ctx context.Context, api reporter, qs []query) snapshot {
+	return collectWithConcurrency(ctx, api, qs, 1)
+}
+
+func collectWithConcurrency(ctx context.Context, api reporter, qs []query, concurrency int) snapshot {
 	s := snapshot{Attempt: time.Now()}
 	var expanded []query
 	var regions []string
@@ -184,12 +188,69 @@ func collect(ctx context.Context, api reporter, qs []query) snapshot {
 			expanded = append(expanded, resolved)
 		}
 	}
+	// One worker owns each region, keeping requests within a region sequential.
+	var regionOrder []string
+	byRegion := map[string][]query{}
+	for _, q := range expanded {
+		if _, ok := byRegion[q.Region]; !ok {
+			regionOrder = append(regionOrder, q.Region)
+		}
+		byRegion[q.Region] = append(byRegion[q.Region], q)
+	}
+	if concurrency < 1 {
+		concurrency = 1
+	}
+	workers := min(concurrency, len(regionOrder))
+	log.Printf("capacity scan: regions=%d configured_queries=%d regional_queries=%d concurrency=%d", len(regionOrder), len(qs), len(expanded), workers)
+	outcomes := make([]snapshot, len(regionOrder))
+	jobs := make(chan int)
+	var wg sync.WaitGroup
+	for worker := 0; worker < workers; worker++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for i := range jobs {
+				region := regionOrder[i]
+				started := time.Now()
+				log.Printf("capacity region: region=%s started queries=%d", region, len(byRegion[region]))
+				outcomes[i] = collectRegion(ctx, api, byRegion[region])
+				log.Printf("capacity region: region=%s completed results=%d errors=%d duration=%.1fs", region, len(outcomes[i].Results), len(outcomes[i].Errors), time.Since(started).Seconds())
+			}
+		}()
+	}
+	for i := range regionOrder {
+		jobs <- i
+	}
+	close(jobs)
+	wg.Wait()
+	// Merge in configuration order, independent of worker completion order.
+	for _, outcome := range outcomes {
+		s.Results = append(s.Results, outcome.Results...)
+		s.Errors = append(s.Errors, outcome.Errors...)
+	}
+	s.Duration = time.Since(s.Attempt).Seconds()
+	s.Success = len(s.Errors) == 0
+	if s.Success {
+		s.LastSuccess = time.Now()
+	} else {
+		s.Results = nil
+	}
+	return s
+}
+
+// collectRegion is called once per region in a scan.
+func collectRegion(ctx context.Context, api reporter, qs []query) snapshot {
+	var s snapshot
 	type discovery struct {
 		names []string
 		err   error
 	}
 	domains := map[string]discovery{}
-	for _, q := range expanded {
+	for _, q := range qs {
+		if err := ctx.Err(); err != nil {
+			s.Errors = append(s.Errors, err.Error())
+			return s
+		}
 		names := []string{q.AvailabilityDomain}
 		if q.AvailabilityDomain == "" {
 			d, ok := domains[q.Region]
@@ -207,6 +268,10 @@ func collect(ctx context.Context, api reporter, qs []query) snapshot {
 			names = d.names
 		}
 		for _, name := range names {
+			if err := ctx.Err(); err != nil {
+				s.Errors = append(s.Errors, err.Error())
+				return s
+			}
 			resolved := q
 			resolved.AvailabilityDomain = name
 			r, err := api.Report(ctx, resolved)
@@ -219,13 +284,6 @@ func collect(ctx context.Context, api reporter, qs []query) snapshot {
 			}
 			s.Results = append(s.Results, result{resolved, r})
 		}
-	}
-	s.Duration = time.Since(s.Attempt).Seconds()
-	s.Success = len(s.Errors) == 0
-	if s.Success {
-		s.LastSuccess = time.Now()
-	} else {
-		s.Results = nil
 	}
 	return s
 }
@@ -318,6 +376,7 @@ func run() error {
 	queries := flag.String("queries", "", "Required non-secret JSON query file or directory")
 	interval := flag.Duration("interval", 5*time.Minute, "Pause after each completed scan (minimum 30s)")
 	timeout := flag.Duration("timeout", 10*time.Minute, "Maximum duration of an entire scan")
+	concurrency := flag.Int("concurrency", 6, "Maximum regions scanned concurrently (1..32); requests within each region are sequential")
 	listen := flag.String("listen", ":9109", "HTTP listen address")
 	flag.Usage = func() {
 		out := flag.CommandLine.Output()
@@ -365,6 +424,9 @@ Capacity is an observation, not a reservation or launch guarantee.
 	if *interval < 30*time.Second || *timeout <= 0 {
 		return errors.New("interval must be >=30s and timeout positive")
 	}
+	if *concurrency < 1 || *concurrency > 32 {
+		return errors.New("concurrency must be between 1 and 32")
+	}
 	qs, err := loadQueries(*queries)
 	if err != nil {
 		return err
@@ -389,7 +451,7 @@ Capacity is an observation, not a reservation or launch guarantee.
 			}
 			api = &ociReporter{provider: p, tenancy: tenancy, clients: map[string]core.ComputeClient{}}
 		}
-		return collect(c, api, qs)
+		return collectWithConcurrency(c, api, qs, *concurrency)
 	}
 	if *once {
 		s := scan()
