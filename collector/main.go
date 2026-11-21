@@ -223,6 +223,40 @@ func run() error {
 	interval := flag.Duration("interval", 5*time.Minute, "Pause after each completed scan (minimum 30s)")
 	timeout := flag.Duration("timeout", 10*time.Minute, "Maximum duration of an entire scan")
 	listen := flag.String("listen", ":9109", "HTTP listen address")
+	flag.Usage = func() {
+		out := flag.CommandLine.Output()
+		fmt.Fprintf(out, "OCI Compute availability collector\n\nUsage: %s [options]\n\nCollect capacity observations for configured regions, availability domains and shapes.\nWith no arguments, print this help and exit.\n\nOptions:\n", os.Args[0])
+		flag.PrintDefaults()
+		fmt.Fprint(out, `
+Environment:
+  OCI_TENANCY_OCID  Required for workload, instance and resource authentication.
+  OCI_RESOURCE_PRINCIPAL_VERSION=2.2 and OCI_RESOURCE_PRINCIPAL_REGION
+                   Required for OKE workload identity.
+
+Examples:
+  collector --auth workload --queries queries.json --interval 5m
+  collector --auth instance --queries queries.json
+  collector --auth resource --queries queries.json
+  collector --once --auth config --config-file /secure/path/oci.properties --queries queries.json
+
+Queries:
+  Supply a JSON array with unique name, region, availabilityDomain and shape.
+  Flex shapes require shapeConfig.ocpus and shapeConfig.memoryInGBs.
+  Optional faultDomain narrows the request. See queries.example.json.
+
+Service endpoints:
+  /metrics  Prometheus metrics
+  /results  Latest complete JSON snapshot
+  /healthz  Process liveness
+
+Capacity is an observation, not a reservation or launch guarantee.
+`)
+	}
+	if len(os.Args) == 1 {
+		flag.CommandLine.SetOutput(os.Stdout)
+		flag.Usage()
+		return nil
+	}
 	flag.Parse()
 	o := authOptions{mode: *mode, configFile: *config, profile: *profile, once: *once}
 	if err := o.validate(); err != nil {

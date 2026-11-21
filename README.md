@@ -11,6 +11,11 @@ Capacity reports use the tenancy root compartment.
 Requires Go 1.26+, a C compiler for race tests, and Docker with Buildx for image
 builds. No OCI access is needed to build or test.
 
+Run `make` or `make help` to list all build targets, settings, and examples.
+
+Run `./dist/collector` with no arguments to print the full help and exit
+successfully. `--help` and `-h` also display the full help.
+
 ```bash
 make test
 make build
