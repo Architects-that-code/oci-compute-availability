@@ -1,0 +1,326 @@
+[
+  {
+    "name": "lhr-e5-2cpu-8gb",
+    "shape": "VM.Standard.E5.Flex",
+    "shapeConfig": {
+      "ocpus": 2,
+      "memoryInGBs": 8
+    },
+    "region": "uk-london-1"
+  },
+  {
+    "name": "lhr-e5-2cpu-16gb",
+    "shape": "VM.Standard.E5.Flex",
+    "shapeConfig": {
+      "ocpus": 2,
+      "memoryInGBs": 16
+    },
+    "region": "uk-london-1"
+  },
+  {
+    "name": "lhr-e5-2cpu-32gb",
+    "shape": "VM.Standard.E5.Flex",
+    "shapeConfig": {
+      "ocpus": 2,
+      "memoryInGBs": 32
+    },
+    "region": "uk-london-1"
+  },
+  {
+    "name": "lhr-e5-4cpu-16gb",
+    "shape": "VM.Standard.E5.Flex",
+    "shapeConfig": {
+      "ocpus": 4,
+      "memoryInGBs": 16
+    },
+    "region": "uk-london-1"
+  },
+  {
+    "name": "lhr-e5-4cpu-32gb",
+    "shape": "VM.Standard.E5.Flex",
+    "shapeConfig": {
+      "ocpus": 4,
+      "memoryInGBs": 32
+    },
+    "region": "uk-london-1"
+  },
+  {
+    "name": "lhr-e5-4cpu-64gb",
+    "shape": "VM.Standard.E5.Flex",
+    "shapeConfig": {
+      "ocpus": 4,
+      "memoryInGBs": 64
+    },
+    "region": "uk-london-1"
+  },
+  {
+    "name": "lhr-e5-8cpu-32gb",
+    "shape": "VM.Standard.E5.Flex",
+    "shapeConfig": {
+      "ocpus": 8,
+      "memoryInGBs": 32
+    },
+    "region": "uk-london-1"
+  },
+  {
+    "name": "lhr-e5-8cpu-64gb",
+    "shape": "VM.Standard.E5.Flex",
+    "shapeConfig": {
+      "ocpus": 8,
+      "memoryInGBs": 64
+    },
+    "region": "uk-london-1"
+  },
+  {
+    "name": "lhr-e5-8cpu-128gb",
+    "shape": "VM.Standard.E5.Flex",
+    "shapeConfig": {
+      "ocpus": 8,
+      "memoryInGBs": 128
+    },
+    "region": "uk-london-1"
+  },
+  {
+    "name": "lhr-e5-16cpu-64gb",
+    "shape": "VM.Standard.E5.Flex",
+    "shapeConfig": {
+      "ocpus": 16,
+      "memoryInGBs": 64
+    },
+    "region": "uk-london-1"
+  },
+  {
+    "name": "lhr-e5-16cpu-128gb",
+    "shape": "VM.Standard.E5.Flex",
+    "shapeConfig": {
+      "ocpus": 16,
+      "memoryInGBs": 128
+    },
+    "region": "uk-london-1"
+  },
+  {
+    "name": "lhr-e5-16cpu-256gb",
+    "shape": "VM.Standard.E5.Flex",
+    "shapeConfig": {
+      "ocpus": 16,
+      "memoryInGBs": 256
+    },
+    "region": "uk-london-1"
+  },
+  {
+    "name": "lhr-e6-2cpu-8gb",
+    "shape": "VM.Standard.E6.Flex",
+    "shapeConfig": {
+      "ocpus": 2,
+      "memoryInGBs": 8
+    },
+    "region": "uk-london-1"
+  },
+  {
+    "name": "lhr-e6-2cpu-16gb",
+    "shape": "VM.Standard.E6.Flex",
+    "shapeConfig": {
+      "ocpus": 2,
+      "memoryInGBs": 16
+    },
+    "region": "uk-london-1"
+  },
+  {
+    "name": "lhr-e6-2cpu-32gb",
+    "shape": "VM.Standard.E6.Flex",
+    "shapeConfig": {
+      "ocpus": 2,
+      "memoryInGBs": 32
+    },
+    "region": "uk-london-1"
+  },
+  {
+    "name": "lhr-e6-4cpu-16gb",
+    "shape": "VM.Standard.E6.Flex",
+    "shapeConfig": {
+      "ocpus": 4,
+      "memoryInGBs": 16
+    },
+    "region": "uk-london-1"
+  },
+  {
+    "name": "lhr-e6-4cpu-32gb",
+    "shape": "VM.Standard.E6.Flex",
+    "shapeConfig": {
+      "ocpus": 4,
+      "memoryInGBs": 32
+    },
+    "region": "uk-london-1"
+  },
+  {
+    "name": "lhr-e6-4cpu-64gb",
+    "shape": "VM.Standard.E6.Flex",
+    "shapeConfig": {
+      "ocpus": 4,
+      "memoryInGBs": 64
+    },
+    "region": "uk-london-1"
+  },
+  {
+    "name": "lhr-e6-8cpu-32gb",
+    "shape": "VM.Standard.E6.Flex",
+    "shapeConfig": {
+      "ocpus": 8,
+      "memoryInGBs": 32
+    },
+    "region": "uk-london-1"
+  },
+  {
+    "name": "lhr-e6-8cpu-64gb",
+    "shape": "VM.Standard.E6.Flex",
+    "shapeConfig": {
+      "ocpus": 8,
+      "memoryInGBs": 64
+    },
+    "region": "uk-london-1"
+  },
+  {
+    "name": "lhr-e6-8cpu-128gb",
+    "shape": "VM.Standard.E6.Flex",
+    "shapeConfig": {
+      "ocpus": 8,
+      "memoryInGBs": 128
+    },
+    "region": "uk-london-1"
+  },
+  {
+    "name": "lhr-e6-16cpu-64gb",
+    "shape": "VM.Standard.E6.Flex",
+    "shapeConfig": {
+      "ocpus": 16,
+      "memoryInGBs": 64
+    },
+    "region": "uk-london-1"
+  },
+  {
+    "name": "lhr-e6-16cpu-128gb",
+    "shape": "VM.Standard.E6.Flex",
+    "shapeConfig": {
+      "ocpus": 16,
+      "memoryInGBs": 128
+    },
+    "region": "uk-london-1"
+  },
+  {
+    "name": "lhr-e6-16cpu-256gb",
+    "shape": "VM.Standard.E6.Flex",
+    "shapeConfig": {
+      "ocpus": 16,
+      "memoryInGBs": 256
+    },
+    "region": "uk-london-1"
+  },
+  {
+    "name": "lhr-e6-ax-2cpu-8gb",
+    "shape": "VM.Standard.E6.Ax.Flex",
+    "shapeConfig": {
+      "ocpus": 2,
+      "memoryInGBs": 8
+    },
+    "region": "uk-london-1"
+  },
+  {
+    "name": "lhr-e6-ax-2cpu-16gb",
+    "shape": "VM.Standard.E6.Ax.Flex",
+    "shapeConfig": {
+      "ocpus": 2,
+      "memoryInGBs": 16
+    },
+    "region": "uk-london-1"
+  },
+  {
+    "name": "lhr-e6-ax-2cpu-32gb",
+    "shape": "VM.Standard.E6.Ax.Flex",
+    "shapeConfig": {
+      "ocpus": 2,
+      "memoryInGBs": 32
+    },
+    "region": "uk-london-1"
+  },
+  {
+    "name": "lhr-e6-ax-4cpu-16gb",
+    "shape": "VM.Standard.E6.Ax.Flex",
+    "shapeConfig": {
+      "ocpus": 4,
+      "memoryInGBs": 16
+    },
+    "region": "uk-london-1"
+  },
+  {
+    "name": "lhr-e6-ax-4cpu-32gb",
+    "shape": "VM.Standard.E6.Ax.Flex",
+    "shapeConfig": {
+      "ocpus": 4,
+      "memoryInGBs": 32
+    },
+    "region": "uk-london-1"
+  },
+  {
+    "name": "lhr-e6-ax-4cpu-64gb",
+    "shape": "VM.Standard.E6.Ax.Flex",
+    "shapeConfig": {
+      "ocpus": 4,
+      "memoryInGBs": 64
+    },
+    "region": "uk-london-1"
+  },
+  {
+    "name": "lhr-e6-ax-8cpu-32gb",
+    "shape": "VM.Standard.E6.Ax.Flex",
+    "shapeConfig": {
+      "ocpus": 8,
+      "memoryInGBs": 32
+    },
+    "region": "uk-london-1"
+  },
+  {
+    "name": "lhr-e6-ax-8cpu-64gb",
+    "shape": "VM.Standard.E6.Ax.Flex",
+    "shapeConfig": {
+      "ocpus": 8,
+      "memoryInGBs": 64
+    },
+    "region": "uk-london-1"
+  },
+  {
+    "name": "lhr-e6-ax-8cpu-128gb",
+    "shape": "VM.Standard.E6.Ax.Flex",
+    "shapeConfig": {
+      "ocpus": 8,
+      "memoryInGBs": 128
+    },
+    "region": "uk-london-1"
+  },
+  {
+    "name": "lhr-e6-ax-16cpu-64gb",
+    "shape": "VM.Standard.E6.Ax.Flex",
+    "shapeConfig": {
+      "ocpus": 16,
+      "memoryInGBs": 64
+    },
+    "region": "uk-london-1"
+  },
+  {
+    "name": "lhr-e6-ax-16cpu-128gb",
+    "shape": "VM.Standard.E6.Ax.Flex",
+    "shapeConfig": {
+      "ocpus": 16,
+      "memoryInGBs": 128
+    },
+    "region": "uk-london-1"
+  },
+  {
+    "name": "lhr-e6-ax-16cpu-256gb",
+    "shape": "VM.Standard.E6.Ax.Flex",
+    "shapeConfig": {
+      "ocpus": 16,
+      "memoryInGBs": 256
+    },
+    "region": "uk-london-1"
+  }
+]

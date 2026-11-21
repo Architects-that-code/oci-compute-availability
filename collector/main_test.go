@@ -16,6 +16,14 @@ import (
 
 type fakeReporter func(context.Context, query) (core.ComputeCapacityReport, error)
 
+func (f fakeReporter) SubscribedRegions(context.Context) ([]string, error) {
+	return nil, errors.New("unexpected subscribed-region discovery")
+}
+
+func (f fakeReporter) AvailabilityDomains(context.Context, string) ([]string, error) {
+	return nil, errors.New("unexpected availability-domain discovery")
+}
+
 func (f fakeReporter) Report(c context.Context, q query) (core.ComputeCapacityReport, error) {
 	return f(c, q)
 }

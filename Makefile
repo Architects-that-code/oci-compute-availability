@@ -1,5 +1,5 @@
 .DEFAULT_GOAL := help
-VERSION ?= v0.1.0
+VERSION ?= v0.1.1
 IMAGE ?= ghcr.io/architects-that-code/oci-compute-availability:$(VERSION)
 PLATFORMS ?= linux/amd64,linux/arm64
 .PHONY: help test build image publish
@@ -23,8 +23,8 @@ help:
 	  '' \
 	  'Examples:' \
 	  '  make build' \
-	  '  make image VERSION=v0.1.0' \
-	  '  make publish VERSION=v0.1.0' \
+	  '  make image VERSION=v0.1.1' \
+	  '  make publish VERSION=v0.1.1' \
 	  '' \
 	  'Collector runtime help: ./dist/collector --help'
 test:

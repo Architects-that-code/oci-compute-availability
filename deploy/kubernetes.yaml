@@ -1,4 +1,5 @@
-# Replace tenancy, AD, and image digest before applying.
+# Replace tenancy and image with a published build supporting region/AD discovery.
+# Adjust shapes/sizes; all subscribed regions and their ADs are scanned by default.
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -10,7 +11,296 @@ metadata:
   name: oci-compute-availability
 data:
   queries.json: |
-    [{"name":"iad-ad1-e5-2cpu-16gb","region":"us-ashburn-1","availabilityDomain":"REPLACE_WITH_YOUR_TENANCY_AD_NAME","shape":"VM.Standard.E5.Flex","shapeConfig":{"ocpus":2,"memoryInGBs":16}}]
+    [
+      {
+        "name": "e5-2cpu-8gb",
+        "shape": "VM.Standard.E5.Flex",
+        "shapeConfig": {
+          "ocpus": 2,
+          "memoryInGBs": 8
+        }
+      },
+      {
+        "name": "e5-2cpu-16gb",
+        "shape": "VM.Standard.E5.Flex",
+        "shapeConfig": {
+          "ocpus": 2,
+          "memoryInGBs": 16
+        }
+      },
+      {
+        "name": "e5-2cpu-32gb",
+        "shape": "VM.Standard.E5.Flex",
+        "shapeConfig": {
+          "ocpus": 2,
+          "memoryInGBs": 32
+        }
+      },
+      {
+        "name": "e5-4cpu-16gb",
+        "shape": "VM.Standard.E5.Flex",
+        "shapeConfig": {
+          "ocpus": 4,
+          "memoryInGBs": 16
+        }
+      },
+      {
+        "name": "e5-4cpu-32gb",
+        "shape": "VM.Standard.E5.Flex",
+        "shapeConfig": {
+          "ocpus": 4,
+          "memoryInGBs": 32
+        }
+      },
+      {
+        "name": "e5-4cpu-64gb",
+        "shape": "VM.Standard.E5.Flex",
+        "shapeConfig": {
+          "ocpus": 4,
+          "memoryInGBs": 64
+        }
+      },
+      {
+        "name": "e5-8cpu-32gb",
+        "shape": "VM.Standard.E5.Flex",
+        "shapeConfig": {
+          "ocpus": 8,
+          "memoryInGBs": 32
+        }
+      },
+      {
+        "name": "e5-8cpu-64gb",
+        "shape": "VM.Standard.E5.Flex",
+        "shapeConfig": {
+          "ocpus": 8,
+          "memoryInGBs": 64
+        }
+      },
+      {
+        "name": "e5-8cpu-128gb",
+        "shape": "VM.Standard.E5.Flex",
+        "shapeConfig": {
+          "ocpus": 8,
+          "memoryInGBs": 128
+        }
+      },
+      {
+        "name": "e5-16cpu-64gb",
+        "shape": "VM.Standard.E5.Flex",
+        "shapeConfig": {
+          "ocpus": 16,
+          "memoryInGBs": 64
+        }
+      },
+      {
+        "name": "e5-16cpu-128gb",
+        "shape": "VM.Standard.E5.Flex",
+        "shapeConfig": {
+          "ocpus": 16,
+          "memoryInGBs": 128
+        }
+      },
+      {
+        "name": "e5-16cpu-256gb",
+        "shape": "VM.Standard.E5.Flex",
+        "shapeConfig": {
+          "ocpus": 16,
+          "memoryInGBs": 256
+        }
+      },
+      {
+        "name": "e6-2cpu-8gb",
+        "shape": "VM.Standard.E6.Flex",
+        "shapeConfig": {
+          "ocpus": 2,
+          "memoryInGBs": 8
+        }
+      },
+      {
+        "name": "e6-2cpu-16gb",
+        "shape": "VM.Standard.E6.Flex",
+        "shapeConfig": {
+          "ocpus": 2,
+          "memoryInGBs": 16
+        }
+      },
+      {
+        "name": "e6-2cpu-32gb",
+        "shape": "VM.Standard.E6.Flex",
+        "shapeConfig": {
+          "ocpus": 2,
+          "memoryInGBs": 32
+        }
+      },
+      {
+        "name": "e6-4cpu-16gb",
+        "shape": "VM.Standard.E6.Flex",
+        "shapeConfig": {
+          "ocpus": 4,
+          "memoryInGBs": 16
+        }
+      },
+      {
+        "name": "e6-4cpu-32gb",
+        "shape": "VM.Standard.E6.Flex",
+        "shapeConfig": {
+          "ocpus": 4,
+          "memoryInGBs": 32
+        }
+      },
+      {
+        "name": "e6-4cpu-64gb",
+        "shape": "VM.Standard.E6.Flex",
+        "shapeConfig": {
+          "ocpus": 4,
+          "memoryInGBs": 64
+        }
+      },
+      {
+        "name": "e6-8cpu-32gb",
+        "shape": "VM.Standard.E6.Flex",
+        "shapeConfig": {
+          "ocpus": 8,
+          "memoryInGBs": 32
+        }
+      },
+      {
+        "name": "e6-8cpu-64gb",
+        "shape": "VM.Standard.E6.Flex",
+        "shapeConfig": {
+          "ocpus": 8,
+          "memoryInGBs": 64
+        }
+      },
+      {
+        "name": "e6-8cpu-128gb",
+        "shape": "VM.Standard.E6.Flex",
+        "shapeConfig": {
+          "ocpus": 8,
+          "memoryInGBs": 128
+        }
+      },
+      {
+        "name": "e6-16cpu-64gb",
+        "shape": "VM.Standard.E6.Flex",
+        "shapeConfig": {
+          "ocpus": 16,
+          "memoryInGBs": 64
+        }
+      },
+      {
+        "name": "e6-16cpu-128gb",
+        "shape": "VM.Standard.E6.Flex",
+        "shapeConfig": {
+          "ocpus": 16,
+          "memoryInGBs": 128
+        }
+      },
+      {
+        "name": "e6-16cpu-256gb",
+        "shape": "VM.Standard.E6.Flex",
+        "shapeConfig": {
+          "ocpus": 16,
+          "memoryInGBs": 256
+        }
+      },
+      {
+        "name": "e6-ax-2cpu-8gb",
+        "shape": "VM.Standard.E6.Ax.Flex",
+        "shapeConfig": {
+          "ocpus": 2,
+          "memoryInGBs": 8
+        }
+      },
+      {
+        "name": "e6-ax-2cpu-16gb",
+        "shape": "VM.Standard.E6.Ax.Flex",
+        "shapeConfig": {
+          "ocpus": 2,
+          "memoryInGBs": 16
+        }
+      },
+      {
+        "name": "e6-ax-2cpu-32gb",
+        "shape": "VM.Standard.E6.Ax.Flex",
+        "shapeConfig": {
+          "ocpus": 2,
+          "memoryInGBs": 32
+        }
+      },
+      {
+        "name": "e6-ax-4cpu-16gb",
+        "shape": "VM.Standard.E6.Ax.Flex",
+        "shapeConfig": {
+          "ocpus": 4,
+          "memoryInGBs": 16
+        }
+      },
+      {
+        "name": "e6-ax-4cpu-32gb",
+        "shape": "VM.Standard.E6.Ax.Flex",
+        "shapeConfig": {
+          "ocpus": 4,
+          "memoryInGBs": 32
+        }
+      },
+      {
+        "name": "e6-ax-4cpu-64gb",
+        "shape": "VM.Standard.E6.Ax.Flex",
+        "shapeConfig": {
+          "ocpus": 4,
+          "memoryInGBs": 64
+        }
+      },
+      {
+        "name": "e6-ax-8cpu-32gb",
+        "shape": "VM.Standard.E6.Ax.Flex",
+        "shapeConfig": {
+          "ocpus": 8,
+          "memoryInGBs": 32
+        }
+      },
+      {
+        "name": "e6-ax-8cpu-64gb",
+        "shape": "VM.Standard.E6.Ax.Flex",
+        "shapeConfig": {
+          "ocpus": 8,
+          "memoryInGBs": 64
+        }
+      },
+      {
+        "name": "e6-ax-8cpu-128gb",
+        "shape": "VM.Standard.E6.Ax.Flex",
+        "shapeConfig": {
+          "ocpus": 8,
+          "memoryInGBs": 128
+        }
+      },
+      {
+        "name": "e6-ax-16cpu-64gb",
+        "shape": "VM.Standard.E6.Ax.Flex",
+        "shapeConfig": {
+          "ocpus": 16,
+          "memoryInGBs": 64
+        }
+      },
+      {
+        "name": "e6-ax-16cpu-128gb",
+        "shape": "VM.Standard.E6.Ax.Flex",
+        "shapeConfig": {
+          "ocpus": 16,
+          "memoryInGBs": 128
+        }
+      },
+      {
+        "name": "e6-ax-16cpu-256gb",
+        "shape": "VM.Standard.E6.Ax.Flex",
+        "shapeConfig": {
+          "ocpus": 16,
+          "memoryInGBs": 256
+        }
+      }
+    ]
 ---
 apiVersion: apps/v1
 kind: Deployment

@@ -1,8 +1,10 @@
 # OCI Compute availability
 
 Standalone Go collector that periodically calls OCI's **CreateComputeCapacityReport**
-API for explicitly configured regions, availability domains, shapes, shape sizes,
-and optional fault domains. Project/repository name: `oci-compute-availability`.
+API for configured shapes, shape sizes, and optional fault domains.
+Subscribed regions and availability domains are discovered automatically unless
+explicitly restricted.
+Project/repository name: `oci-compute-availability`.
 It does not launch instances, reserve capacity, or scan other compartments.
 Capacity reports use the tenancy root compartment.
 
@@ -17,16 +19,72 @@ Run `./dist/collector` with no arguments to print the full help and exit
 successfully. `--help` and `-h` also display the full help.
 
 ```bash
-make test
-make build
+make build # runs race tests and go vet, then builds dist/collector
 cp queries.example.json queries.json
-# Edit queries.json: supply your tenancy-specific AD names and desired shapes.
-export OCI_TENANCY_OCID=ocid1.tenancy.oc1..REPLACE
-./dist/collector --auth workload --queries queries.json --interval 5m
+# Edit queries.json to select your shapes/sizes; region and AD are optional.
+./dist/collector --once --auth config \
+  --profile DEFAULT --config-file "$HOME/.oci/config" \
+  --queries queries.json
 ```
 
-The example is an input template, not collected data. Each query has a unique
-`name`, `region`, `availabilityDomain`, and `shape`. Flex shapes require explicit
+The local scan reads the tenancy OCID from your selected OCI profile and
+discovers subscribed regions and AD names automatically. No tenancy OCID,
+region, or AD name is required in the
+default query sample. `--once` prints JSON and exits; it does not start the HTTP
+service. A complete scan returns `"success":true` and exit code 0. A failed scan
+returns errors and a nonzero exit code. Run `make test` for automated tests
+without OCI access. See [Optional local credentials](#optional-local-credentials)
+for the required API-key profile fields.
+
+Automatic region/AD discovery and directory input require a build from the updated
+source. The previously published `v0.1.0` image requires explicit regions and AD names.
+Publish a new version before using these samples in a container.
+
+## Query configuration
+
+The samples are input templates, not collected data.
+[queries.example.json](queries.example.json) contains 36 queries: 12 configurations
+each for `VM.Standard.E5.Flex`, `VM.Standard.E6.Flex`, and
+`VM.Standard.E6.Ax.Flex`, using the names in Oracle's
+[Compute Shapes reference](https://docs.oracle.com/en-us/iaas/Content/Compute/References/computeshapes.htm).
+Each shape uses these OCPU and memory combinations:
+
+| OCPUs | Memory variants (GB) |
+| --- | --- |
+| 2 | 8, 16, 32 |
+| 4 | 16, 32, 64 |
+| 8 | 32, 64, 128 |
+| 16 | 64, 128, 256 |
+
+Each entry has its own query name. For example:
+
+```json
+[
+  {
+    "name": "e5-2cpu-16gb",
+    "shape": "VM.Standard.E5.Flex",
+    "shapeConfig": {"ocpus": 2, "memoryInGBs": 16}
+  }
+]
+```
+
+Each query requires a globally unique `name` and a `shape`.
+Omit `region` to scan all of the authenticated tenancy's subscribed regions,
+or set `"region": "us-ashburn-1"` to restrict that query to Ashburn.
+Subscriptions are discovered once per scan using `ListRegionSubscriptions`;
+the profile's region selects the initial API endpoint, not the scan scope.
+Empty subscription lists and discovery failures fail the scan. Returned
+subscriptions are not silently dropped based on readiness; an inaccessible
+region causes the scan to fail.
+Omit `availabilityDomain` to query every AD
+discovered for your tenancy in that region, or set it to restrict the query to
+one AD (an explicit AD requires an explicit region). AD discovery uses the
+authenticated identity and tenancy, once per region
+per scan. Results and metrics include the resolved AD names. Discovery failures
+or an empty domain list fail the scan instead of silently skipping a region.
+The principal must be allowed to call `ListRegionSubscriptions` and
+[ListAvailabilityDomains](https://docs.oracle.com/en-us/iaas/tools/go/latest/example/index.html#example-IdentityClient.ListAvailabilityDomains).
+Flex shapes require explicit
 `shapeConfig.ocpus` and `shapeConfig.memoryInGBs`. Optional `faultDomain` narrows
 the request. Leave it absent for OCI's report across fault domains. Optional
 shape configuration also supports `nvmes` and `baselineOcpuUtilization`.
@@ -54,8 +112,19 @@ IAM for the OKE service account, or dynamic groups and IAM policies for Compute
 and Container Instances. Compute containers must reach the host's metadata
 service. Container Instances must expose their resource principal to the container.
 For workload identity set `OCI_RESOURCE_PRINCIPAL_VERSION=2.2` and the initial
-`OCI_RESOURCE_PRINCIPAL_REGION`. Request regions come from the query file.
+`OCI_RESOURCE_PRINCIPAL_REGION`. Request regions come from tenancy subscriptions,
+unless restricted in the query file.
 `OCI_TENANCY_OCID` is required for every runtime identity.
+
+For example, inside an OKE pod with workload identity configured:
+
+```bash
+export OCI_TENANCY_OCID=ocid1.tenancy.oc1..REPLACE
+./dist/collector --auth workload --queries queries.json --interval 5m
+```
+
+The environment variable supplies the tenancy for runtime identities; it is
+not required with local `--auth config`. AD discovery applies to every auth mode.
 
 Grant the chosen principal `COMPUTE_CAPACITY_REPORT_CREATE` on
 `compute-capacity-reports` in the tenancy. For a dynamic group, the policy form is:
@@ -75,6 +144,8 @@ and [OCI SDK authentication](https://docs.oracle.com/en-us/iaas/Content/API/Conc
 Local one-shot validation can explicitly load a standard OCI SDK INI properties
 file. There is no default-file discovery, identity fallback, or Terraform-variable
 authentication. File authentication is rejected for the long-running service.
+The tenancy OCID comes from the selected profile; query JSON requires neither
+a tenancy OCID, region, nor an availability-domain name.
 
 Keep the following file and its API key **outside this repository**:
 
@@ -88,8 +159,10 @@ region=us-ashburn-1
 ```
 
 ```bash
-./dist/collector --once --auth config --config-file /secure/path/oci.properties --queries queries.json
-# Optional: --profile NAME
+./dist/collector --once --auth config \
+  --profile DEFAULT --config-file "$HOME/.oci/config" \
+  --queries queries.json
+# Replace DEFAULT with another named profile if needed.
 ```
 
 Restrict file/key permissions. Never commit, deploy, or bake them into an image.
@@ -110,7 +183,7 @@ Results are held in memory; Prometheus provides metric history. No database or
 local result files are written by the service. Protect `/results` and `/metrics`
 with your cluster network policy; these endpoints have no built-in HTTP authentication.
 
-A failed query, malformed response, or unknown status suppresses all capacity
+A failed region/AD discovery, failed query, malformed response, or unknown status suppresses all capacity
 result series for that scan. Diagnostics remain available, including
 `oci_capacity_collection_success`, `oci_capacity_collection_errors`, duration,
 and attempt/last-success timestamps. Alert on failures and last-success age;
@@ -128,9 +201,11 @@ See [CreateComputeCapacityReport](https://docs.oracle.com/en-us/iaas/tools/oci-c
 ## Kubernetes deployment
 
 `deploy/kubernetes.yaml` supplies one Deployment, ServiceAccount, query ConfigMap,
-and Service. Replace the tenancy OCID, tenancy-specific AD, and image version;
+and Service. Replace the tenancy OCID and image version;
 configure workload IAM before applying into your chosen namespace. No credential
-file is deployed. The image must already be published and pullable by the nodes.
+file is deployed. Its 36 sample queries discover all subscribed regions and ADs;
+edit the shapes/sizes or add a region filter for your workload. The image must include automatic region/AD
+discovery and already be published and pullable by the nodes.
 The resource requests/limit are starting estimates; measure a representative scan
 and adjust them. Recreate strategy avoids overlapping rollout collectors.
 Configure Prometheus to scrape the Service's `metrics` port. A Grafana dashboard
@@ -139,8 +214,8 @@ is available in `dashboards/oci-compute-availability.json`.
 ## Publishing
 
 ```bash
-make image VERSION=v0.1.0     # local multiarchitecture OCI archive
-make publish VERSION=v0.1.0   # tests, builds and pushes to GHCR
+make image VERSION=v0.1.1     # local multiarchitecture OCI archive
+make publish VERSION=v0.1.1   # tests, builds and pushes to GHCR
 ```
 
 Alternatively, after creating the GitHub repository and pushing this project,
@@ -152,3 +227,31 @@ on exit. Both Linux AMD64 and ARM64 are built. Existing tags are reused; publish
 changed source under a new version and deploy by digest when practical.
 New GHCR package visibility must be checked independently of repository visibility;
 make the package public for anonymous pulls or configure image-pull credentials.
+
+## One global collector (v0.1.1+)
+
+`--queries` also accepts a directory of regional `.json` files. One process loads
+and validates all files in sorted order, then scans every configured region.
+Each file retains the 1 MiB / 1,000-query bounds; the combined directory supports
+up to 100,000 queries with globally unique names. Kubernetes projected ConfigMap
+symlinks are supported. Mount one ConfigMap per regional file into a shared
+projected volume so no ConfigMap exceeds Kubernetes' size limit.
+
+The [examples/queries](examples/queries) directory contains separate Ashburn and
+London query files, each with the same 36 E5/E6/E6.Ax sizing variants, globally unique
+names, and automatic AD discovery. These 72 queries each expand across the ADs
+in their region. Edit
+the regions and shapes/sizes for your workload, then test the full directory:
+
+```bash
+./dist/collector --once --auth config \
+  --profile DEFAULT --config-file "$HOME/.oci/config" \
+  --queries examples/queries
+```
+
+For large global matrices use an explicit scan timeout appropriate to the query
+count multiplied by subscribed regions and ADs per region, for example
+`--queries /etc/capacity --timeout 1h`. Scans remain sequential;
+`--interval 5m` is a pause after the entire global scan, not a five-minute freshness
+guarantee. A failure anywhere suppresses all capacity-result series for that scan.
+Publish `make publish VERSION=v0.1.1` before deploying this directory configuration.

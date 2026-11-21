@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -34,7 +35,48 @@ type snapshot struct {
 	Results     []result  `json:"results"`
 }
 
+// A projected ConfigMap volume contains one JSON file per region. Read these
+// into one process without exceeding the Kubernetes per-ConfigMap size limit.
 func loadQueries(path string) ([]query, error) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, err
+	}
+	if !info.IsDir() {
+		return loadQueryFile(path)
+	}
+	entries, err := os.ReadDir(path)
+	if err != nil {
+		return nil, err
+	}
+	var queries []query
+	seen := map[string]bool{}
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+		fileQueries, err := loadQueryFile(filepath.Join(path, entry.Name()))
+		if err != nil {
+			return nil, fmt.Errorf("%s: %w", entry.Name(), err)
+		}
+		for _, q := range fileQueries {
+			if seen[q.Name] {
+				return nil, fmt.Errorf("duplicate query name across files: %s", q.Name)
+			}
+			seen[q.Name] = true
+			queries = append(queries, q)
+		}
+		if len(queries) > 100000 {
+			return nil, errors.New("configure at most 100000 queries across the directory")
+		}
+	}
+	if len(queries) == 0 {
+		return nil, errors.New("query directory must contain nonempty .json query files")
+	}
+	return queries, nil
+}
+
+func loadQueryFile(path string) ([]query, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, err
@@ -55,8 +97,11 @@ func loadQueries(path string) ([]query, error) {
 	}
 	seen := map[string]bool{}
 	for _, q := range qs {
-		if q.Name == "" || q.Region == "" || q.AvailabilityDomain == "" || q.Shape == "" || seen[q.Name] {
-			return nil, errors.New("each query requires unique name, region, availabilityDomain, and shape")
+		if q.Name == "" || q.Shape == "" || seen[q.Name] {
+			return nil, errors.New("each query requires unique name and shape")
+		}
+		if q.AvailabilityDomain != "" && q.Region == "" {
+			return nil, errors.New("an explicit availabilityDomain requires a region")
 		}
 		seen[q.Name] = true
 		if strings.HasSuffix(q.Shape, ".Flex") && (q.ShapeConfig == nil || q.ShapeConfig.Ocpus == nil || q.ShapeConfig.MemoryInGBs == nil) {
@@ -113,16 +158,67 @@ func validateReport(q query, r core.ComputeCapacityReport) error {
 
 func collect(ctx context.Context, api reporter, qs []query) snapshot {
 	s := snapshot{Attempt: time.Now()}
+	var expanded []query
+	var regions []string
+	var regionErr error
+	regionsLoaded := false
 	for _, q := range qs {
-		r, err := api.Report(ctx, q)
-		if err == nil {
-			err = validateReport(q, r)
-		}
-		if err != nil {
-			s.Errors = append(s.Errors, fmt.Sprintf("%s: %v", q.Name, err))
+		if q.Region != "" {
+			expanded = append(expanded, q)
 			continue
 		}
-		s.Results = append(s.Results, result{q, r})
+		if !regionsLoaded {
+			regions, regionErr = api.SubscribedRegions(ctx)
+			if regionErr == nil && len(regions) == 0 {
+				regionErr = errors.New("no subscribed regions returned")
+			}
+			regionsLoaded = true
+		}
+		if regionErr != nil {
+			s.Errors = append(s.Errors, fmt.Sprintf("%s: discover subscribed regions: %v", q.Name, regionErr))
+			continue
+		}
+		for _, region := range regions {
+			resolved := q
+			resolved.Region = region
+			expanded = append(expanded, resolved)
+		}
+	}
+	type discovery struct {
+		names []string
+		err   error
+	}
+	domains := map[string]discovery{}
+	for _, q := range expanded {
+		names := []string{q.AvailabilityDomain}
+		if q.AvailabilityDomain == "" {
+			d, ok := domains[q.Region]
+			if !ok {
+				d.names, d.err = api.AvailabilityDomains(ctx, q.Region)
+				if d.err == nil && len(d.names) == 0 {
+					d.err = errors.New("no availability domains returned")
+				}
+				domains[q.Region] = d
+			}
+			if d.err != nil {
+				s.Errors = append(s.Errors, fmt.Sprintf("%s: discover availability domains in %s: %v", q.Name, q.Region, d.err))
+				continue
+			}
+			names = d.names
+		}
+		for _, name := range names {
+			resolved := q
+			resolved.AvailabilityDomain = name
+			r, err := api.Report(ctx, resolved)
+			if err == nil {
+				err = validateReport(resolved, r)
+			}
+			if err != nil {
+				s.Errors = append(s.Errors, fmt.Sprintf("%s (%s, %s): %v", q.Name, resolved.Region, name, err))
+				continue
+			}
+			s.Results = append(s.Results, result{resolved, r})
+		}
 	}
 	s.Duration = time.Since(s.Attempt).Seconds()
 	s.Success = len(s.Errors) == 0
@@ -219,7 +315,7 @@ func run() error {
 	config := flag.String("config-file", "", "Explicit local OCI properties file")
 	profile := flag.String("profile", "DEFAULT", "Local OCI profile")
 	once := flag.Bool("once", false, "Collect once, print JSON and exit")
-	queries := flag.String("queries", "", "Required non-secret JSON query file")
+	queries := flag.String("queries", "", "Required non-secret JSON query file or directory")
 	interval := flag.Duration("interval", 5*time.Minute, "Pause after each completed scan (minimum 30s)")
 	timeout := flag.Duration("timeout", 10*time.Minute, "Maximum duration of an entire scan")
 	listen := flag.String("listen", ":9109", "HTTP listen address")
@@ -240,9 +336,13 @@ Examples:
   collector --once --auth config --config-file /secure/path/oci.properties --queries queries.json
 
 Queries:
-  Supply a JSON array with unique name, region, availabilityDomain and shape.
+  Supply a JSON array with unique name and shape.
+  Omit region to scan all subscribed regions; set region to restrict a query.
+  Omit availabilityDomain to discover and query all ADs in each region.
+  Set availabilityDomain with region to restrict a query to one AD.
   Flex shapes require shapeConfig.ocpus and shapeConfig.memoryInGBs.
   Optional faultDomain narrows the request. See queries.example.json.
+  A directory merges .json files into one global scan (1..1000 queries/file).
 
 Service endpoints:
   /metrics  Prometheus metrics
