@@ -5,6 +5,8 @@ API for configured shapes, shape sizes, and optional fault domains.
 Subscribed regions and availability domains are discovered automatically unless
 explicitly restricted.
 Project/repository name: `oci-compute-availability`.
+Run continuously in Kubernetes to give teams a self-service Grafana view of
+where their desired shape and sizing combinations have recently been available.
 It does not launch instances, reserve capacity, or scan other compartments.
 Capacity reports use the tenancy root compartment.
 
@@ -81,7 +83,8 @@ discovered for your tenancy in that region, or set it to restrict the query to
 one AD (an explicit AD requires an explicit region). AD discovery uses the
 authenticated identity and tenancy, once per region
 per scan. Results and metrics include the resolved AD names. Discovery failures
-or an empty domain list fail the scan instead of silently skipping a region.
+or an empty domain list mark the scan incomplete and expose unknown outcomes;
+successful checks elsewhere remain visible.
 The principal must be allowed to call `ListRegionSubscriptions` and
 [ListAvailabilityDomains](https://docs.oracle.com/en-us/iaas/tools/go/latest/example/index.html#example-IdentityClient.ListAvailabilityDomains).
 Flex shapes require explicit
@@ -176,20 +179,35 @@ Query JSON contains workload requirements, not credentials; mount it separately.
 
 HTTP listens on `:9109` (`--listen` overrides it):
 
-- `/metrics`: Prometheus gauges with query, region, AD, shape and fault-domain labels.
-- `/results`: latest complete snapshot, including requested shape sizes and raw OCI reports.
+- `/metrics`: Prometheus gauges with query, region, AD, shape, OCPU, memory and fault-domain labels.
+- `/results`: latest scan, including successful results and structured failures with check times.
 - `/healthz`: process liveness, independent of OCI collection success.
 
-`--once` prints the snapshot as JSON and exits nonzero if incomplete.
+`--once` prints the snapshot as JSON and exits nonzero if incomplete. A partial
+snapshot still includes its successful results. Each result has `checkedAt`;
+`failures` contains query scope, `checkedAt`, failure stage, and error details.
+Failed checks replace previous observations with unknown outcomes; old available
+capacity is never silently reused after an error. Discovery failures use
+`UNKNOWN` region/AD labels when those names could not be resolved.
 Results are held in memory; Prometheus provides metric history. No database or
 local result files are written by the service. Protect `/results` and `/metrics`
 with your cluster network policy; these endpoints have no built-in HTTP authentication.
 
-A failed region/AD discovery, failed query, malformed response, or unknown status suppresses all capacity
-result series for that scan. Diagnostics remain available, including
+A failed region/AD discovery, failed query, malformed response, or unknown status
+marks only the affected check unknown. Successful observations from that scan
+remain available in JSON and metrics. Global diagnostics include
 `oci_capacity_collection_success`, `oci_capacity_collection_errors`, duration,
-and attempt/last-success timestamps. Alert on failures and last-success age;
-HTTP liveness alone does not establish successful collection.
+and attempt/last-success timestamps. Global success is zero for partial scans;
+the last-success timestamp means the most recent fully successful scan, rather
+than the freshness of every individual result. HTTP liveness alone does not
+establish successful collection.
+
+`oci_capacity_state` provides per-observation states: 0 unknown, 1 available,
+2 out of capacity, 3 unsupported. `oci_capacity_checked_timestamp_seconds`
+records each check's completion time. The dashboard computes age from that time
+and displays state 4 (stale) after the selected threshold. Failed checks emit
+state 0 and `oci_capacity_check_failure{stage="..."}`; they emit neither available
+counts nor binary availability. Error text stays in logs and JSON.
 
 `oci_capacity_available_count` is emitted only when OCI supplies a count: missing
 counts are unknown, not zero. `oci_capacity_available` is one only for `AVAILABLE`;
@@ -215,8 +233,9 @@ elapsed time across regions; it does not reduce the number of OCI requests.
 Progress is written to stderr: scan scope, regional start/completion, result/error
 counts, and regional elapsed time. One-shot result JSON remains on stdout.
 `--timeout` still limits the entire scan, including discovery, retries, and queued
-regions. Cancellation stops further capacity requests. Runtime failures in one
-region still mark the full scan incomplete and suppress all capacity results.
+regions. Cancellation stops further capacity requests and marks uncompleted
+checks unknown. Runtime failures in one region mark the full scan incomplete
+while preserving successful observations from the other checks.
 
 For a quick smoke test, use a smaller query file or add an explicit `region`
 filter. This narrows coverage; `--concurrency` preserves the configured scope.
@@ -237,6 +256,42 @@ The resource requests/limit are starting estimates; measure a representative sca
 and adjust them. Recreate strategy avoids overlapping rollout collectors.
 Configure Prometheus to scrape the Service's `metrics` port. A Grafana dashboard
 is available in `dashboards/oci-compute-availability.json`.
+
+Run the deployed collector continuously, without `--once`. For Prometheus running
+inside the same cluster, a simple scrape configuration for namespace `monitoring`
+is:
+
+```yaml
+scrape_configs:
+  - job_name: oci-compute-availability
+    scrape_interval: 30s
+    static_configs:
+      - targets:
+          - oci-compute-availability.monitoring.svc.cluster.local:9109
+```
+
+Adapt the namespace, or use your existing ServiceMonitor/scrape discovery setup.
+Import the dashboard JSON in Grafana and select this Prometheus data source.
+Select a collector job and instance, then filter region, shape, OCPUs, and memory.
+The dashboard keeps collector sources separate rather than combining customer
+results. Data access remains governed by your Grafana and data-source permissions.
+
+The first table shows only fresh AVAILABLE deployment options. The second shows
+every observation, including unknown, unsupported, out-of-capacity and stale
+rows. Both show per-check time, age, sizing, and available instance count when
+OCI provides it. The default stale threshold is 900 seconds; adjust it to your
+scan duration plus interval. Old counts do not make a stale row deployable.
+Failed-stage details and availability history appear below the tables. No data
+means no observations are currently available; it is not proof of zero capacity.
+
+Collector connection, scan completeness, and individual observation freshness
+are separate indicators. Each completed scan is published atomically, so the
+previous snapshot remains visible while the next scan runs and continues aging.
+Prometheus supplies history; the collector does not retain a durable database.
+
+Validate dashboard queries with `make dashboard-test` (Python 3 and either
+`promtool` or Docker). The fixtures exercise mixed success/failure, stale data,
+unknown counts, and separation between collectors without requiring OCI access.
 
 ## Publishing
 
@@ -281,5 +336,6 @@ count multiplied by subscribed regions and ADs per region, for example
 `--queries /etc/capacity --timeout 1h --concurrency 6`. Regions are scanned with
 bounded concurrency; requests within a region remain sequential;
 `--interval 5m` is a pause after the entire global scan, not a five-minute freshness
-guarantee. A failure anywhere suppresses all capacity-result series for that scan.
+guarantee. A failure marks the affected checks unknown and the scan incomplete;
+successful observations remain visible with their individual timestamps.
 Publish `make publish VERSION=v0.1.1` before deploying this directory configuration.

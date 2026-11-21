@@ -27,6 +27,8 @@ jobs:
           cache-dependency-path: collector/go.sum
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
+      - name: Validate customer dashboard queries
+        run: make dashboard-test
       - name: Test and publish both architectures
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

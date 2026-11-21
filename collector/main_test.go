@@ -48,7 +48,7 @@ func TestUnknownCountsAndZeroCounts(t *testing.T) {
 		t.Fatal(metrics(s))
 	}
 }
-func TestPartialFailureSuppressesResults(t *testing.T) {
+func TestPartialFailurePreservesSuccessfulResults(t *testing.T) {
 	q := fixture()
 	q2 := q
 	q2.Name = "failing"
@@ -59,7 +59,7 @@ func TestPartialFailureSuppressesResults(t *testing.T) {
 		return report(q), nil
 	})
 	s := collect(context.Background(), api, []query{q, q2})
-	if s.Success || len(s.Errors) != 1 || len(s.Results) != 0 || strings.Contains(metrics(s), "oci_capacity_available{") {
+	if s.Success || len(s.Errors) != 1 || len(s.Results) != 1 || len(s.Failures) != 1 || !strings.Contains(metrics(s), "oci_capacity_available{") {
 		t.Fatal(s)
 	}
 	st := &store{s: snapshot{LastSuccess: time.Now()}}

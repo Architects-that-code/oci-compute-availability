@@ -59,7 +59,7 @@ func TestAllSubscribedRegionsAndExplicitFilter(t *testing.T) {
 	}
 }
 
-func TestRegionDiscoveryFailureSuppressesPartialResults(t *testing.T) {
+func TestRegionDiscoveryFailurePreservesExplicitResults(t *testing.T) {
 	for _, err := range []error{nil, errors.New("denied")} {
 		calls := 0
 		api := regionReporter{
@@ -72,7 +72,7 @@ func TestRegionDiscoveryFailureSuppressesPartialResults(t *testing.T) {
 		global := q
 		global.Name, global.Region, global.AvailabilityDomain = "global", "", ""
 		s := collect(context.Background(), api, []query{q, global, global})
-		if s.Success || len(s.Results) != 0 || len(s.Errors) != 2 || calls != 1 {
+		if s.Success || len(s.Results) != 1 || len(s.Errors) != 2 || calls != 1 {
 			t.Fatalf("snapshot=%+v calls=%d", s, calls)
 		}
 	}

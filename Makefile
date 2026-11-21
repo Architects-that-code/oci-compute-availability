@@ -2,7 +2,7 @@
 VERSION ?= v0.1.1
 IMAGE ?= ghcr.io/architects-that-code/oci-compute-availability:$(VERSION)
 PLATFORMS ?= linux/amd64,linux/arm64
-.PHONY: help test build image publish
+.PHONY: help test dashboard-test build image publish
 help:
 	@printf '%s\n' \
 	  'OCI Compute availability' \
@@ -12,6 +12,7 @@ help:
 	  'Targets:' \
 	  '  help     Print this help (default when running make)' \
 	  '  test     Run Go race tests and go vet' \
+	  '  dashboard-test  Validate Grafana queries with promtool or Docker' \
 	  '  build    Test and build dist/collector' \
 	  '  image    Test and create dist/collector.oci.tar with Docker Buildx' \
 	  '  publish  Test, build and push both architectures to GHCR' \
@@ -29,6 +30,8 @@ help:
 	  'Collector runtime help: ./dist/collector --help'
 test:
 	cd collector && go test -race ./... && go vet ./...
+dashboard-test:
+	python3 scripts/test-dashboard.py
 build: test
 	mkdir -p dist
 	cd collector && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o ../dist/collector .

@@ -60,7 +60,7 @@ func TestDiscoverAllDomainsPerRegion(t *testing.T) {
 	}
 }
 
-func TestDiscoveryFailureSuppressesPartialResults(t *testing.T) {
+func TestDiscoveryFailurePreservesExplicitResults(t *testing.T) {
 	for _, discoveryErr := range []error{errors.New("denied"), nil} {
 		calls := 0
 		api := discoveryReporter{
@@ -76,13 +76,13 @@ func TestDiscoveryFailureSuppressesPartialResults(t *testing.T) {
 		other := implicit
 		other.Name = "other"
 		s := collect(context.Background(), api, []query{explicit, implicit, other})
-		if s.Success || len(s.Results) != 0 || len(s.Errors) != 2 || calls != 1 {
+		if s.Success || len(s.Results) != 1 || len(s.Errors) != 2 || calls != 1 {
 			t.Fatalf("snapshot=%+v discovery calls=%d", s, calls)
 		}
 	}
 }
 
-func TestFailureInDiscoveredDomainSuppressesResults(t *testing.T) {
+func TestFailureInDiscoveredDomainPreservesResults(t *testing.T) {
 	api := discoveryReporter{
 		fakeReporter: func(_ context.Context, q query) (core.ComputeCapacityReport, error) {
 			if q.AvailabilityDomain == "AD-2" {
@@ -95,7 +95,7 @@ func TestFailureInDiscoveredDomainSuppressesResults(t *testing.T) {
 	q := fixture()
 	q.AvailabilityDomain = ""
 	s := collect(context.Background(), api, []query{q})
-	if s.Success || len(s.Results) != 0 || len(s.Errors) != 1 || !strings.Contains(s.Errors[0], "AD-2") {
+	if s.Success || len(s.Results) != 1 || len(s.Errors) != 1 || !strings.Contains(s.Errors[0], "AD-2") {
 		t.Fatalf("snapshot=%+v", s)
 	}
 }

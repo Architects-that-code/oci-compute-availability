@@ -93,8 +93,8 @@ func TestParallelFailureAndCancellation(t *testing.T) {
 		return report(q), nil
 	})
 	s := collectWithConcurrency(context.Background(), api, queries, 3)
-	if s.Success || len(s.Results) != 0 || len(s.Errors) != 1 {
-		t.Fatalf("partial results were published: %+v", s)
+	if s.Success || len(s.Results) != 2 || len(s.Failures) != 1 || len(s.Errors) != 1 {
+		t.Fatalf("successful results were lost: %+v", s)
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()
@@ -103,7 +103,7 @@ func TestParallelFailureAndCancellation(t *testing.T) {
 		return core.ComputeCapacityReport{}, nil
 	})
 	s = collectWithConcurrency(ctx, api, queries, 2)
-	if s.Success || len(s.Results) != 0 {
+	if s.Success || len(s.Results) != 0 || len(s.Failures) != len(queries) {
 		t.Fatalf("cancelled scan succeeded: %+v", s)
 	}
 }

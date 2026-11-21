@@ -1,17 +1,20 @@
 {
   "uid": "oci-compute-availability",
-  "title": "OCI Compute availability",
+  "title": "OCI Compute deployment options",
+  "description": "Find fresh observed capacity by region, AD, shape and sizing. Successful checks survive partial collection failures.",
   "schemaVersion": 39,
-  "version": 1,
+  "version": 2,
   "tags": [
     "oci",
-    "capacity"
+    "capacity",
+    "self-service"
   ],
-  "refresh": "1m",
+  "refresh": "30s",
   "time": {
     "from": "now-6h",
     "to": "now"
   },
+  "timezone": "browser",
   "__inputs": [
     {
       "name": "DS_PROMETHEUS",
@@ -21,11 +24,188 @@
       "pluginName": "Prometheus"
     }
   ],
+  "templating": {
+    "list": [
+      {
+        "name": "job",
+        "label": "Collector job",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS_PROMETHEUS}"
+        },
+        "definition": "label_values(oci_capacity_collection_success, job)",
+        "query": {
+          "query": "label_values(oci_capacity_collection_success, job)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "sort": 1,
+        "multi": false,
+        "includeAll": false,
+        "options": []
+      },
+      {
+        "name": "instance",
+        "label": "Collector instance",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS_PROMETHEUS}"
+        },
+        "definition": "label_values(oci_capacity_collection_success{job=\"$job\"}, instance)",
+        "query": {
+          "query": "label_values(oci_capacity_collection_success{job=\"$job\"}, instance)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "sort": 1,
+        "multi": false,
+        "includeAll": false,
+        "options": []
+      },
+      {
+        "name": "region",
+        "label": "Region",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS_PROMETHEUS}"
+        },
+        "definition": "label_values(oci_capacity_state{job=\"$job\",instance=\"$instance\"}, region)",
+        "query": {
+          "query": "label_values(oci_capacity_state{job=\"$job\",instance=\"$instance\"}, region)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "options": []
+      },
+      {
+        "name": "shape",
+        "label": "Shape",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS_PROMETHEUS}"
+        },
+        "definition": "label_values(oci_capacity_state{job=\"$job\",instance=\"$instance\"}, shape)",
+        "query": {
+          "query": "label_values(oci_capacity_state{job=\"$job\",instance=\"$instance\"}, shape)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "options": []
+      },
+      {
+        "name": "ocpus",
+        "label": "OCPUs",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS_PROMETHEUS}"
+        },
+        "definition": "label_values(oci_capacity_state{job=\"$job\",instance=\"$instance\"}, ocpus)",
+        "query": {
+          "query": "label_values(oci_capacity_state{job=\"$job\",instance=\"$instance\"}, ocpus)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "options": []
+      },
+      {
+        "name": "memory",
+        "label": "Memory (GB)",
+        "type": "query",
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${DS_PROMETHEUS}"
+        },
+        "definition": "label_values(oci_capacity_state{job=\"$job\",instance=\"$instance\"}, memory_gbs)",
+        "query": {
+          "query": "label_values(oci_capacity_state{job=\"$job\",instance=\"$instance\"}, memory_gbs)",
+          "refId": "StandardVariableQuery"
+        },
+        "refresh": 2,
+        "sort": 1,
+        "multi": true,
+        "includeAll": true,
+        "allValue": ".*",
+        "current": {
+          "text": "All",
+          "value": "$__all"
+        },
+        "options": []
+      },
+      {
+        "name": "freshness",
+        "label": "Stale after (seconds)",
+        "type": "custom",
+        "query": "300,600,900,1800,3600",
+        "current": {
+          "text": "900",
+          "value": "900"
+        },
+        "options": [
+          {
+            "text": "300",
+            "value": "300",
+            "selected": false
+          },
+          {
+            "text": "600",
+            "value": "600",
+            "selected": false
+          },
+          {
+            "text": "900",
+            "value": "900",
+            "selected": true
+          },
+          {
+            "text": "1800",
+            "value": "1800",
+            "selected": false
+          },
+          {
+            "text": "3600",
+            "value": "3600",
+            "selected": false
+          }
+        ],
+        "multi": false,
+        "includeAll": false
+      }
+    ]
+  },
   "panels": [
     {
       "id": 1,
-      "title": "Collection successful",
-      "type": "stat",
+      "title": "Where can I deploy?",
+      "type": "text",
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
@@ -33,79 +213,139 @@
       "gridPos": {
         "x": 0,
         "y": 0,
-        "w": 12,
-        "h": 8
+        "w": 24,
+        "h": 3
       },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "oci_capacity_collection_success",
-          "legendFormat": "{{query}} {{fault_domain}}"
-        }
-      ],
+      "targets": [],
+      "description": "",
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "noValue": "Unknown"
+        },
         "overrides": []
       },
-      "options": {}
+      "options": {
+        "mode": "markdown",
+        "content": "Choose a region, shape, OCPU count and memory size. **AVAILABLE** means OCI reported capacity at the displayed check time. **UNKNOWN** means a check failed; **STALE** means it is older than the selected age limit. Missing counts are unknown, not zero. Capacity can change before an instance is launched."
+      }
     },
     {
       "id": 2,
-      "title": "Available instances",
-      "type": "timeseries",
-      "datasource": {
-        "type": "prometheus",
-        "uid": "${DS_PROMETHEUS}"
-      },
-      "gridPos": {
-        "x": 12,
-        "y": 0,
-        "w": 12,
-        "h": 8
-      },
-      "targets": [
-        {
-          "refId": "A",
-          "expr": "oci_capacity_available_count",
-          "legendFormat": "{{query}} {{fault_domain}}"
-        }
-      ],
-      "fieldConfig": {
-        "defaults": {},
-        "overrides": []
-      },
-      "options": {}
-    },
-    {
-      "id": 3,
-      "title": "Capacity available",
-      "type": "timeseries",
+      "title": "Collector connection",
+      "type": "stat",
       "datasource": {
         "type": "prometheus",
         "uid": "${DS_PROMETHEUS}"
       },
       "gridPos": {
         "x": 0,
-        "y": 8,
-        "w": 12,
-        "h": 8
+        "y": 3,
+        "w": 6,
+        "h": 4
       },
       "targets": [
         {
           "refId": "A",
-          "expr": "oci_capacity_available",
-          "legendFormat": "{{query}} {{fault_domain}}"
+          "expr": "up{job=\"$job\",instance=\"$instance\"}",
+          "format": "time_series",
+          "instant": true,
+          "range": false,
+          "editorMode": "code"
         }
       ],
+      "description": "",
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "noValue": "Not scraped",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "OFFLINE",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "CONNECTED",
+                  "color": "green"
+                }
+              }
+            }
+          ]
+        },
         "overrides": []
       },
-      "options": {}
+      "options": {
+        "colorMode": "background",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        },
+        "textMode": "value"
+      }
+    },
+    {
+      "id": 3,
+      "title": "Latest scan coverage",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 6,
+        "y": 3,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "oci_capacity_collection_success{job=\"$job\",instance=\"$instance\"}",
+          "format": "time_series",
+          "instant": true,
+          "range": false,
+          "editorMode": "code"
+        }
+      ],
+      "description": "A partial scan retains successful observations. Connection and observation age are shown separately.",
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "Unknown",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "PARTIAL / FAILED",
+                  "color": "orange"
+                },
+                "1": {
+                  "text": "COMPLETE",
+                  "color": "green"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "colorMode": "background",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        },
+        "textMode": "value"
+      }
     },
     {
       "id": 4,
-      "title": "Seconds since complete collection",
+      "title": "Fresh deployment options",
       "type": "stat",
       "datasource": {
         "type": "prometheus",
@@ -113,22 +353,606 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 8,
-        "w": 12,
-        "h": 8
+        "y": 3,
+        "w": 6,
+        "h": 4
       },
       "targets": [
         {
           "refId": "A",
-          "expr": "time() - oci_capacity_last_success_timestamp_seconds",
-          "legendFormat": "{{query}} {{fault_domain}}"
+          "expr": "count((((oci_capacity_state{job=\"$job\",instance=\"$instance\",region=~\"${region:regex}\",shape=~\"${shape:regex}\",ocpus=~\"${ocpus:regex}\",memory_gbs=~\"${memory:regex}\"} and ((time() - oci_capacity_checked_timestamp_seconds{job=\"$job\",instance=\"$instance\",region=~\"${region:regex}\",shape=~\"${shape:regex}\",ocpus=~\"${ocpus:regex}\",memory_gbs=~\"${memory:regex}\"}) <= ${freshness:raw})) or (0 * (oci_capacity_state{job=\"$job\",instance=\"$instance\",region=~\"${region:regex}\",shape=~\"${shape:regex}\",ocpus=~\"${ocpus:regex}\",memory_gbs=~\"${memory:regex}\"} and ((time() - oci_capacity_checked_timestamp_seconds{job=\"$job\",instance=\"$instance\",region=~\"${region:regex}\",shape=~\"${shape:regex}\",ocpus=~\"${ocpus:regex}\",memory_gbs=~\"${memory:regex}\"}) > ${freshness:raw})) + 4)) == 1)) or (0 * count(oci_capacity_state{job=\"$job\",instance=\"$instance\",region=~\"${region:regex}\",shape=~\"${shape:regex}\",ocpus=~\"${ocpus:regex}\",memory_gbs=~\"${memory:regex}\"}))",
+          "format": "time_series",
+          "instant": true,
+          "range": false,
+          "editorMode": "code"
         }
       ],
+      "description": "Count of matching region/AD/fault-domain observations with fresh AVAILABLE status. Counts are alternatives, not additive capacity.",
       "fieldConfig": {
-        "defaults": {},
+        "defaults": {
+          "noValue": "Unknown"
+        },
         "overrides": []
       },
-      "options": {}
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 5,
+      "title": "Failed checks in latest scan",
+      "type": "stat",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 18,
+        "y": 3,
+        "w": 6,
+        "h": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "oci_capacity_collection_errors{job=\"$job\",instance=\"$instance\"}",
+          "format": "time_series",
+          "instant": true,
+          "range": false,
+          "editorMode": "code"
+        }
+      ],
+      "description": "Applies to the entire selected collector, before shape/region filters.",
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "Unknown"
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "values": false
+        }
+      }
+    },
+    {
+      "id": 6,
+      "title": "Fresh options for new instances",
+      "type": "table",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 7,
+        "w": 24,
+        "h": 11
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "1 * ((((oci_capacity_state{job=\"$job\",instance=\"$instance\",region=~\"${region:regex}\",shape=~\"${shape:regex}\",ocpus=~\"${ocpus:regex}\",memory_gbs=~\"${memory:regex}\"} and ((time() - oci_capacity_checked_timestamp_seconds{job=\"$job\",instance=\"$instance\",region=~\"${region:regex}\",shape=~\"${shape:regex}\",ocpus=~\"${ocpus:regex}\",memory_gbs=~\"${memory:regex}\"}) <= ${freshness:raw})) or (0 * (oci_capacity_state{job=\"$job\",instance=\"$instance\",region=~\"${region:regex}\",shape=~\"${shape:regex}\",ocpus=~\"${ocpus:regex}\",memory_gbs=~\"${memory:regex}\"} and ((time() - oci_capacity_checked_timestamp_seconds{job=\"$job\",instance=\"$instance\",region=~\"${region:regex}\",shape=~\"${shape:regex}\",ocpus=~\"${ocpus:regex}\",memory_gbs=~\"${memory:regex}\"}) > ${freshness:raw})) + 4)) == 1))",
+          "format": "table",
+          "instant": true,
+          "range": false,
+          "editorMode": "code"
+        },
+        {
+          "refId": "B",
+          "expr": "((time() - oci_capacity_checked_timestamp_seconds{job=\"$job\",instance=\"$instance\",region=~\"${region:regex}\",shape=~\"${shape:regex}\",ocpus=~\"${ocpus:regex}\",memory_gbs=~\"${memory:regex}\"})) and ((((oci_capacity_state{job=\"$job\",instance=\"$instance\",region=~\"${region:regex}\",shape=~\"${shape:regex}\",ocpus=~\"${ocpus:regex}\",memory_gbs=~\"${memory:regex}\"} and ((time() - oci_capacity_checked_timestamp_seconds{job=\"$job\",instance=\"$instance\",region=~\"${region:regex}\",shape=~\"${shape:regex}\",ocpus=~\"${ocpus:regex}\",memory_gbs=~\"${memory:regex}\"}) <= ${freshness:raw})) or (0 * (oci_capacity_state{job=\"$job\",instance=\"$instance\",region=~\"${region:regex}\",shape=~\"${shape:regex}\",ocpus=~\"${ocpus:regex}\",memory_gbs=~\"${memory:regex}\"} and ((time() - oci_capacity_checked_timestamp_seconds{job=\"$job\",instance=\"$instance\",region=~\"${region:regex}\",shape=~\"${shape:regex}\",ocpus=~\"${ocpus:regex}\",memory_gbs=~\"${memory:regex}\"}) > ${freshness:raw})) + 4)) == 1))",
+          "format": "table",
+          "instant": true,
+          "range": false,
+          "editorMode": "code"
+        },
+        {
+          "refId": "C",
+          "expr": "(1 * oci_capacity_available_count{job=\"$job\",instance=\"$instance\",region=~\"${region:regex}\",shape=~\"${shape:regex}\",ocpus=~\"${ocpus:regex}\",memory_gbs=~\"${memory:regex}\"}) and ((((oci_capacity_state{job=\"$job\",instance=\"$instance\",region=~\"${region:regex}\",shape=~\"${shape:regex}\",ocpus=~\"${ocpus:regex}\",memory_gbs=~\"${memory:regex}\"} and ((time() - oci_capacity_checked_timestamp_seconds{job=\"$job\",instance=\"$instance\",region=~\"${region:regex}\",shape=~\"${shape:regex}\",ocpus=~\"${ocpus:regex}\",memory_gbs=~\"${memory:regex}\"}) <= ${freshness:raw})) or (0 * (oci_capacity_state{job=\"$job\",instance=\"$instance\",region=~\"${region:regex}\",shape=~\"${shape:regex}\",ocpus=~\"${ocpus:regex}\",memory_gbs=~\"${memory:regex}\"} and ((time() - oci_capacity_checked_timestamp_seconds{job=\"$job\",instance=\"$instance\",region=~\"${region:regex}\",shape=~\"${shape:regex}\",ocpus=~\"${ocpus:regex}\",memory_gbs=~\"${memory:regex}\"}) > ${freshness:raw})) + 4)) == 1))",
+          "format": "table",
+          "instant": true,
+          "range": false,
+          "editorMode": "code"
+        },
+        {
+          "refId": "D",
+          "expr": "(1000 * oci_capacity_checked_timestamp_seconds{job=\"$job\",instance=\"$instance\",region=~\"${region:regex}\",shape=~\"${shape:regex}\",ocpus=~\"${ocpus:regex}\",memory_gbs=~\"${memory:regex}\"}) and ((((oci_capacity_state{job=\"$job\",instance=\"$instance\",region=~\"${region:regex}\",shape=~\"${shape:regex}\",ocpus=~\"${ocpus:regex}\",memory_gbs=~\"${memory:regex}\"} and ((time() - oci_capacity_checked_timestamp_seconds{job=\"$job\",instance=\"$instance\",region=~\"${region:regex}\",shape=~\"${shape:regex}\",ocpus=~\"${ocpus:regex}\",memory_gbs=~\"${memory:regex}\"}) <= ${freshness:raw})) or (0 * (oci_capacity_state{job=\"$job\",instance=\"$instance\",region=~\"${region:regex}\",shape=~\"${shape:regex}\",ocpus=~\"${ocpus:regex}\",memory_gbs=~\"${memory:regex}\"} and ((time() - oci_capacity_checked_timestamp_seconds{job=\"$job\",instance=\"$instance\",region=~\"${region:regex}\",shape=~\"${shape:regex}\",ocpus=~\"${ocpus:regex}\",memory_gbs=~\"${memory:regex}\"}) > ${freshness:raw})) + 4)) == 1))",
+          "format": "table",
+          "instant": true,
+          "range": false,
+          "editorMode": "code"
+        }
+      ],
+      "description": "Only fresh AVAILABLE observations. An empty table does not prove no capacity: inspect unknown, stale, and failed checks below. Available instance counts are alternatives across overlapping queries; do not add them.",
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "Unknown"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Status"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "0": {
+                        "text": "UNKNOWN",
+                        "color": "orange"
+                      },
+                      "1": {
+                        "text": "AVAILABLE",
+                        "color": "green"
+                      },
+                      "2": {
+                        "text": "OUT OF CAPACITY",
+                        "color": "red"
+                      },
+                      "3": {
+                        "text": "UNSUPPORTED",
+                        "color": "purple"
+                      },
+                      "4": {
+                        "text": "STALE",
+                        "color": "gray"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Age"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Checked at"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeAsIso"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Available instances"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "noValue",
+                "value": "Unknown"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        },
+        "sortBy": [
+          {
+            "displayName": "Region",
+            "desc": false
+          }
+        ]
+      },
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "job": true,
+              "instance": true,
+              "__name__": true
+            },
+            "renameByName": {
+              "region": "Region",
+              "availability_domain": "Availability domain",
+              "shape": "Shape",
+              "ocpus": "OCPUs",
+              "memory_gbs": "Memory (GB)",
+              "fault_domain": "Fault domain",
+              "query": "Configuration",
+              "Value #A": "Status",
+              "Value #B": "Age",
+              "Value #C": "Available instances",
+              "Value #D": "Checked at"
+            },
+            "indexByName": {
+              "region": 0,
+              "availability_domain": 1,
+              "shape": 2,
+              "ocpus": 3,
+              "memory_gbs": 4,
+              "fault_domain": 5,
+              "Value #A": 6,
+              "Value #C": 7,
+              "Value #B": 8,
+              "Value #D": 9,
+              "query": 10
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 7,
+      "title": "All deployment observations",
+      "type": "table",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 18,
+        "w": 24,
+        "h": 13
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "1 * (((oci_capacity_state{job=\"$job\",instance=\"$instance\",region=~\"${region:regex}\",shape=~\"${shape:regex}\",ocpus=~\"${ocpus:regex}\",memory_gbs=~\"${memory:regex}\"} and ((time() - oci_capacity_checked_timestamp_seconds{job=\"$job\",instance=\"$instance\",region=~\"${region:regex}\",shape=~\"${shape:regex}\",ocpus=~\"${ocpus:regex}\",memory_gbs=~\"${memory:regex}\"}) <= ${freshness:raw})) or (0 * (oci_capacity_state{job=\"$job\",instance=\"$instance\",region=~\"${region:regex}\",shape=~\"${shape:regex}\",ocpus=~\"${ocpus:regex}\",memory_gbs=~\"${memory:regex}\"} and ((time() - oci_capacity_checked_timestamp_seconds{job=\"$job\",instance=\"$instance\",region=~\"${region:regex}\",shape=~\"${shape:regex}\",ocpus=~\"${ocpus:regex}\",memory_gbs=~\"${memory:regex}\"}) > ${freshness:raw})) + 4)))",
+          "format": "table",
+          "instant": true,
+          "range": false,
+          "editorMode": "code"
+        },
+        {
+          "refId": "B",
+          "expr": "((time() - oci_capacity_checked_timestamp_seconds{job=\"$job\",instance=\"$instance\",region=~\"${region:regex}\",shape=~\"${shape:regex}\",ocpus=~\"${ocpus:regex}\",memory_gbs=~\"${memory:regex}\"})) and (((oci_capacity_state{job=\"$job\",instance=\"$instance\",region=~\"${region:regex}\",shape=~\"${shape:regex}\",ocpus=~\"${ocpus:regex}\",memory_gbs=~\"${memory:regex}\"} and ((time() - oci_capacity_checked_timestamp_seconds{job=\"$job\",instance=\"$instance\",region=~\"${region:regex}\",shape=~\"${shape:regex}\",ocpus=~\"${ocpus:regex}\",memory_gbs=~\"${memory:regex}\"}) <= ${freshness:raw})) or (0 * (oci_capacity_state{job=\"$job\",instance=\"$instance\",region=~\"${region:regex}\",shape=~\"${shape:regex}\",ocpus=~\"${ocpus:regex}\",memory_gbs=~\"${memory:regex}\"} and ((time() - oci_capacity_checked_timestamp_seconds{job=\"$job\",instance=\"$instance\",region=~\"${region:regex}\",shape=~\"${shape:regex}\",ocpus=~\"${ocpus:regex}\",memory_gbs=~\"${memory:regex}\"}) > ${freshness:raw})) + 4)))",
+          "format": "table",
+          "instant": true,
+          "range": false,
+          "editorMode": "code"
+        },
+        {
+          "refId": "C",
+          "expr": "(1 * oci_capacity_available_count{job=\"$job\",instance=\"$instance\",region=~\"${region:regex}\",shape=~\"${shape:regex}\",ocpus=~\"${ocpus:regex}\",memory_gbs=~\"${memory:regex}\"}) and (((oci_capacity_state{job=\"$job\",instance=\"$instance\",region=~\"${region:regex}\",shape=~\"${shape:regex}\",ocpus=~\"${ocpus:regex}\",memory_gbs=~\"${memory:regex}\"} and ((time() - oci_capacity_checked_timestamp_seconds{job=\"$job\",instance=\"$instance\",region=~\"${region:regex}\",shape=~\"${shape:regex}\",ocpus=~\"${ocpus:regex}\",memory_gbs=~\"${memory:regex}\"}) <= ${freshness:raw})) or (0 * (oci_capacity_state{job=\"$job\",instance=\"$instance\",region=~\"${region:regex}\",shape=~\"${shape:regex}\",ocpus=~\"${ocpus:regex}\",memory_gbs=~\"${memory:regex}\"} and ((time() - oci_capacity_checked_timestamp_seconds{job=\"$job\",instance=\"$instance\",region=~\"${region:regex}\",shape=~\"${shape:regex}\",ocpus=~\"${ocpus:regex}\",memory_gbs=~\"${memory:regex}\"}) > ${freshness:raw})) + 4)))",
+          "format": "table",
+          "instant": true,
+          "range": false,
+          "editorMode": "code"
+        },
+        {
+          "refId": "D",
+          "expr": "(1000 * oci_capacity_checked_timestamp_seconds{job=\"$job\",instance=\"$instance\",region=~\"${region:regex}\",shape=~\"${shape:regex}\",ocpus=~\"${ocpus:regex}\",memory_gbs=~\"${memory:regex}\"}) and (((oci_capacity_state{job=\"$job\",instance=\"$instance\",region=~\"${region:regex}\",shape=~\"${shape:regex}\",ocpus=~\"${ocpus:regex}\",memory_gbs=~\"${memory:regex}\"} and ((time() - oci_capacity_checked_timestamp_seconds{job=\"$job\",instance=\"$instance\",region=~\"${region:regex}\",shape=~\"${shape:regex}\",ocpus=~\"${ocpus:regex}\",memory_gbs=~\"${memory:regex}\"}) <= ${freshness:raw})) or (0 * (oci_capacity_state{job=\"$job\",instance=\"$instance\",region=~\"${region:regex}\",shape=~\"${shape:regex}\",ocpus=~\"${ocpus:regex}\",memory_gbs=~\"${memory:regex}\"} and ((time() - oci_capacity_checked_timestamp_seconds{job=\"$job\",instance=\"$instance\",region=~\"${region:regex}\",shape=~\"${shape:regex}\",ocpus=~\"${ocpus:regex}\",memory_gbs=~\"${memory:regex}\"}) > ${freshness:raw})) + 4)))",
+          "format": "table",
+          "instant": true,
+          "range": false,
+          "editorMode": "code"
+        }
+      ],
+      "description": "Per-configuration status and check time, including successful observations from partial scans. Region or AD UNKNOWN means discovery failed. Stale rows are never shown in the fresh-options table.",
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "Unknown"
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Status"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "0": {
+                        "text": "UNKNOWN",
+                        "color": "orange"
+                      },
+                      "1": {
+                        "text": "AVAILABLE",
+                        "color": "green"
+                      },
+                      "2": {
+                        "text": "OUT OF CAPACITY",
+                        "color": "red"
+                      },
+                      "3": {
+                        "text": "UNSUPPORTED",
+                        "color": "purple"
+                      },
+                      "4": {
+                        "text": "STALE",
+                        "color": "gray"
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background",
+                  "mode": "basic"
+                }
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Age"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Checked at"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "dateTimeAsIso"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Available instances"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "noValue",
+                "value": "Unknown"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        },
+        "sortBy": [
+          {
+            "displayName": "Region",
+            "desc": false
+          }
+        ]
+      },
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "job": true,
+              "instance": true,
+              "__name__": true
+            },
+            "renameByName": {
+              "region": "Region",
+              "availability_domain": "Availability domain",
+              "shape": "Shape",
+              "ocpus": "OCPUs",
+              "memory_gbs": "Memory (GB)",
+              "fault_domain": "Fault domain",
+              "query": "Configuration",
+              "Value #A": "Status",
+              "Value #B": "Age",
+              "Value #C": "Available instances",
+              "Value #D": "Checked at"
+            },
+            "indexByName": {
+              "region": 0,
+              "availability_domain": 1,
+              "shape": 2,
+              "ocpus": 3,
+              "memory_gbs": 4,
+              "fault_domain": 5,
+              "Value #A": 6,
+              "Value #C": 7,
+              "Value #B": 8,
+              "Value #D": 9,
+              "query": 10
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 8,
+      "title": "Checks requiring attention",
+      "type": "table",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 31,
+        "w": 24,
+        "h": 9
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "1 * oci_capacity_check_failure{job=\"$job\",instance=\"$instance\",region=~\"${region:regex}\",shape=~\"${shape:regex}\",ocpus=~\"${ocpus:regex}\",memory_gbs=~\"${memory:regex}\"}",
+          "format": "table",
+          "instant": true,
+          "range": false,
+          "editorMode": "code"
+        }
+      ],
+      "description": "Failure stage identifies discovery, authentication, cancellation, or a capacity request. Full error details are in collector logs and /results; a failed check is UNKNOWN, not out of capacity.",
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "Unknown"
+        },
+        "overrides": []
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm"
+      },
+      "transformations": [
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "job": true,
+              "instance": true
+            },
+            "renameByName": {
+              "region": "Region",
+              "availability_domain": "Availability domain",
+              "shape": "Shape",
+              "ocpus": "OCPUs",
+              "memory_gbs": "Memory (GB)",
+              "stage": "Failed stage",
+              "query": "Configuration",
+              "Value": "Failed"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "id": 9,
+      "title": "Availability history at each check",
+      "type": "state-timeline",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 40,
+        "w": 24,
+        "h": 10
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "((oci_capacity_state{job=\"$job\",instance=\"$instance\",region=~\"${region:regex}\",shape=~\"${shape:regex}\",ocpus=~\"${ocpus:regex}\",memory_gbs=~\"${memory:regex}\"} and ((time() - oci_capacity_checked_timestamp_seconds{job=\"$job\",instance=\"$instance\",region=~\"${region:regex}\",shape=~\"${shape:regex}\",ocpus=~\"${ocpus:regex}\",memory_gbs=~\"${memory:regex}\"}) <= ${freshness:raw})) or (0 * (oci_capacity_state{job=\"$job\",instance=\"$instance\",region=~\"${region:regex}\",shape=~\"${shape:regex}\",ocpus=~\"${ocpus:regex}\",memory_gbs=~\"${memory:regex}\"} and ((time() - oci_capacity_checked_timestamp_seconds{job=\"$job\",instance=\"$instance\",region=~\"${region:regex}\",shape=~\"${shape:regex}\",ocpus=~\"${ocpus:regex}\",memory_gbs=~\"${memory:regex}\"}) > ${freshness:raw})) + 4))",
+          "format": "time_series",
+          "instant": false,
+          "range": true,
+          "editorMode": "code",
+          "legendFormat": "{{region}} / {{availability_domain}} / {{shape}} / {{ocpus}} OCPU / {{memory_gbs}} GB / {{fault_domain}}"
+        }
+      ],
+      "description": "Gaps mean no exported observation. Historical availability is not a deployment guarantee. Filter region, shape and sizing to reduce the number of rows.",
+      "fieldConfig": {
+        "defaults": {
+          "noValue": "Unknown",
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "UNKNOWN",
+                  "color": "orange"
+                },
+                "1": {
+                  "text": "AVAILABLE",
+                  "color": "green"
+                },
+                "2": {
+                  "text": "OUT OF CAPACITY",
+                  "color": "red"
+                },
+                "3": {
+                  "text": "UNSUPPORTED",
+                  "color": "purple"
+                },
+                "4": {
+                  "text": "STALE",
+                  "color": "gray"
+                }
+              }
+            }
+          ]
+        },
+        "overrides": []
+      },
+      "options": {
+        "mergeValues": true,
+        "rowHeight": 0.8,
+        "showValue": "auto",
+        "legend": {
+          "displayMode": "list",
+          "showLegend": true
+        }
+      }
     }
   ]
 }

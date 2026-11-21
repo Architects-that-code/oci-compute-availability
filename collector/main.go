@@ -15,7 +15,6 @@ import (
 	"os"
 	"os/signal"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -23,9 +22,17 @@ import (
 )
 
 type result struct {
-	Query  query                      `json:"query"`
-	Report core.ComputeCapacityReport `json:"report"`
+	Query     query                      `json:"query"`
+	Report    core.ComputeCapacityReport `json:"report"`
+	CheckedAt time.Time                  `json:"checkedAt"`
 }
+type failure struct {
+	Query     query     `json:"query"`
+	CheckedAt time.Time `json:"checkedAt"`
+	Stage     string    `json:"stage"`
+	Error     string    `json:"error"`
+}
+
 type snapshot struct {
 	Attempt     time.Time `json:"attempt"`
 	LastSuccess time.Time `json:"lastSuccess"`
@@ -33,6 +40,13 @@ type snapshot struct {
 	Success     bool      `json:"success"`
 	Errors      []string  `json:"errors,omitempty"`
 	Results     []result  `json:"results"`
+	Failures    []failure `json:"failures,omitempty"`
+}
+
+// fail records an unknown outcome, never a negative capacity observation.
+func (s *snapshot) fail(q query, stage string, err error) {
+	s.Failures = append(s.Failures, failure{Query: q, CheckedAt: time.Now(), Stage: stage, Error: err.Error()})
+	s.Errors = append(s.Errors, fmt.Sprintf("%s (%s, %s): %s: %v", q.Name, q.Region, q.AvailabilityDomain, stage, err))
 }
 
 // A projected ConfigMap volume contains one JSON file per region. Read these
@@ -179,7 +193,7 @@ func collectWithConcurrency(ctx context.Context, api reporter, qs []query, concu
 			regionsLoaded = true
 		}
 		if regionErr != nil {
-			s.Errors = append(s.Errors, fmt.Sprintf("%s: discover subscribed regions: %v", q.Name, regionErr))
+			s.fail(q, "regions", regionErr)
 			continue
 		}
 		for _, region := range regions {
@@ -227,13 +241,12 @@ func collectWithConcurrency(ctx context.Context, api reporter, qs []query, concu
 	for _, outcome := range outcomes {
 		s.Results = append(s.Results, outcome.Results...)
 		s.Errors = append(s.Errors, outcome.Errors...)
+		s.Failures = append(s.Failures, outcome.Failures...)
 	}
 	s.Duration = time.Since(s.Attempt).Seconds()
 	s.Success = len(s.Errors) == 0
 	if s.Success {
 		s.LastSuccess = time.Now()
-	} else {
-		s.Results = nil
 	}
 	return s
 }
@@ -247,95 +260,45 @@ func collectRegion(ctx context.Context, api reporter, qs []query) snapshot {
 	}
 	domains := map[string]discovery{}
 	for _, q := range qs {
-		if err := ctx.Err(); err != nil {
-			s.Errors = append(s.Errors, err.Error())
-			return s
-		}
 		names := []string{q.AvailabilityDomain}
 		if q.AvailabilityDomain == "" {
 			d, ok := domains[q.Region]
 			if !ok {
-				d.names, d.err = api.AvailabilityDomains(ctx, q.Region)
+				if err := ctx.Err(); err != nil {
+					d.err = err
+				} else {
+					d.names, d.err = api.AvailabilityDomains(ctx, q.Region)
+				}
 				if d.err == nil && len(d.names) == 0 {
 					d.err = errors.New("no availability domains returned")
 				}
 				domains[q.Region] = d
 			}
 			if d.err != nil {
-				s.Errors = append(s.Errors, fmt.Sprintf("%s: discover availability domains in %s: %v", q.Name, q.Region, d.err))
+				s.fail(q, "availability_domains", d.err)
 				continue
 			}
 			names = d.names
 		}
 		for _, name := range names {
-			if err := ctx.Err(); err != nil {
-				s.Errors = append(s.Errors, err.Error())
-				return s
-			}
 			resolved := q
 			resolved.AvailabilityDomain = name
+			if err := ctx.Err(); err != nil {
+				s.fail(resolved, "cancelled", err)
+				continue
+			}
 			r, err := api.Report(ctx, resolved)
 			if err == nil {
 				err = validateReport(resolved, r)
 			}
 			if err != nil {
-				s.Errors = append(s.Errors, fmt.Sprintf("%s (%s, %s): %v", q.Name, resolved.Region, name, err))
+				s.fail(resolved, "capacity", err)
 				continue
 			}
-			s.Results = append(s.Results, result{resolved, r})
+			s.Results = append(s.Results, result{Query: resolved, Report: r, CheckedAt: time.Now()})
 		}
 	}
 	return s
-}
-
-func metrics(s snapshot) string {
-	var b strings.Builder
-	gauge := func(n, help string) { fmt.Fprintf(&b, "# HELP %s %s\n# TYPE %s gauge\n", n, help, n) }
-	scalar := func(n, help string, v any) { gauge(n, help); fmt.Fprintf(&b, "%s %v\n", n, v) }
-	success := 0
-	if s.Success {
-		success = 1
-	}
-	ts := func(t time.Time) float64 {
-		if t.IsZero() {
-			return 0
-		}
-		return float64(t.UnixNano()) / 1e9
-	}
-	scalar("oci_capacity_collection_success", "One when all configured queries succeeded.", success)
-	scalar("oci_capacity_last_attempt_timestamp_seconds", "Latest attempt start time.", ts(s.Attempt))
-	scalar("oci_capacity_last_success_timestamp_seconds", "Latest complete successful scan.", ts(s.LastSuccess))
-	scalar("oci_capacity_collection_duration_seconds", "Latest scan duration.", s.Duration)
-	scalar("oci_capacity_collection_errors", "Failed queries in latest scan.", len(s.Errors))
-	var counts, available, statuses strings.Builder
-	if s.Success {
-		for _, r := range s.Results {
-			for _, a := range r.Report.ShapeAvailabilities {
-				fd := ""
-				if a.FaultDomain != nil {
-					fd = *a.FaultDomain
-				}
-				// The stable query name identifies the complete requested shape configuration.
-				labels := fmt.Sprintf("query=%s,region=%s,availability_domain=%s,shape=%s,fault_domain=%s", strconv.Quote(r.Query.Name), strconv.Quote(r.Query.Region), strconv.Quote(r.Query.AvailabilityDomain), strconv.Quote(r.Query.Shape), strconv.Quote(fd))
-				if a.AvailableCount != nil {
-					fmt.Fprintf(&counts, "oci_capacity_available_count{%s} %d\n", labels, *a.AvailableCount)
-				}
-				v := 0
-				if string(a.AvailabilityStatus) == "AVAILABLE" {
-					v = 1
-				}
-				fmt.Fprintf(&available, "oci_capacity_available{%s} %d\n", labels, v)
-				fmt.Fprintf(&statuses, "oci_capacity_status{%s,status=%s} 1\n", labels, strconv.Quote(string(a.AvailabilityStatus)))
-			}
-		}
-	}
-	gauge("oci_capacity_available_count", "Reported launchable instance count for the requested shape configuration; absent when unknown.")
-	b.WriteString(counts.String())
-	gauge("oci_capacity_available", "One if OCI reports AVAILABLE for this query.")
-	b.WriteString(available.String())
-	gauge("oci_capacity_status", "Reported capacity status, with value one.")
-	b.WriteString(statuses.String())
-	return b.String()
 }
 
 type store struct {
@@ -447,7 +410,11 @@ Capacity is an observation, not a reservation or launch guarantee.
 				tenancy, e = p.TenancyOCID()
 			}
 			if e != nil {
-				return snapshot{Attempt: time.Now(), Errors: []string{e.Error()}}
+				s := snapshot{Attempt: time.Now()}
+				for _, q := range qs {
+					s.fail(q, "authentication", e)
+				}
+				return s
 			}
 			api = &ociReporter{provider: p, tenancy: tenancy, clients: map[string]core.ComputeClient{}}
 		}
