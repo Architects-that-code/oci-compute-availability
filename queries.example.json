@@ -1,0 +1,9 @@
+[
+  {
+    "name": "iad-ad1-e5-2cpu-16gb",
+    "region": "us-ashburn-1",
+    "availabilityDomain": "REPLACE_WITH_YOUR_TENANCY_AD_NAME",
+    "shape": "VM.Standard.E5.Flex",
+    "shapeConfig": {"ocpus": 2, "memoryInGBs": 16}
+  }
+]

@@ -1,0 +1,93 @@
+# Replace tenancy, AD, and image digest before applying.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: oci-compute-availability
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: oci-compute-availability
+data:
+  queries.json: |
+    [{"name":"iad-ad1-e5-2cpu-16gb","region":"us-ashburn-1","availabilityDomain":"REPLACE_WITH_YOUR_TENANCY_AD_NAME","shape":"VM.Standard.E5.Flex","shapeConfig":{"ocpus":2,"memoryInGBs":16}}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: oci-compute-availability
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: oci-compute-availability
+  template:
+    metadata:
+      labels:
+        app: oci-compute-availability
+    spec:
+      serviceAccountName: oci-compute-availability
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        runAsGroup: 65532
+        fsGroup: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: collector
+          image: ghcr.io/architects-that-code/oci-compute-availability:REPLACE_WITH_PUBLISHED_VERSION
+          args: ["--auth", "workload", "--queries", "/etc/capacity/queries.json", "--interval", "5m"]
+          env:
+            - name: OCI_TENANCY_OCID
+              value: REPLACE_WITH_TENANCY_OCID
+            - name: OCI_RESOURCE_PRINCIPAL_VERSION
+              value: "2.2"
+            - name: OCI_RESOURCE_PRINCIPAL_REGION
+              value: us-ashburn-1
+          ports:
+            - name: metrics
+              containerPort: 9109
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: metrics
+          resources:
+            requests:
+              cpu: 10m
+              memory: 64Mi
+            limits:
+              memory: 256Mi
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: queries
+              mountPath: /etc/capacity
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: queries
+          configMap:
+            name: oci-compute-availability
+        - name: tmp
+          emptyDir:
+            sizeLimit: 16Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: oci-compute-availability
+spec:
+  selector:
+    app: oci-compute-availability
+  ports:
+    - name: metrics
+      port: 9109
+      targetPort: metrics
+
